@@ -1,68 +1,80 @@
-# Polis — AI Operational Intelligence Chatbot
+# 🏛️ Polis
 
-Polis is an enterprise-grade AI Operational Intelligence Assistant that analyzes discussions to identify tasks, decisions, risks, contradictions, unrealistic commitments, and generates executive summaries.
+**Operational Intelligence for the Modern Organization**
 
-## Features
+Polis is a production-ready AI Operational Intelligence Assistant designed to analyze multi-source discussions and extract structured, actionable insights. Unlike generic chatbots, Polis focuses on identifying tasks, risks, contradictions, and feasibility to provide a clear picture of organizational health.
 
-- **Multi-Agent Analysis** — 7 specialized AI agents (Transcript, Task, Contradiction, Risk, Feasibility, Validator, Executive Summary)
-- **LangGraph Orchestration** — Parallel agent execution with validation pipeline
-- **Contradiction Detection** — Timeline, resource, technical, business, and dependency contradictions
-- **Risk Assessment** — Technical, operational, business, delivery, and compliance risks
-- **Feasibility Analysis** — Realistic, unrealistic, impossible, under-scoped, or missing-info determination
-- **Multi-Channel** — Web Chat UI, Slack, WhatsApp
-- **Organizational Memory** — Semantic retrieval with Qdrant vector database
-- **File Processing** — Audio, PDFs, text documents
+---
 
-## Tech Stack
+## 🚀 Key Features
 
-| Layer       | Technology                          |
-|-------------|-------------------------------------|
-| Backend     | FastAPI, Python 3.11                |
-| Database    | PostgreSQL                          |
-| Cache       | Redis                               |
-| Queue       | Celery                              |
-| Vector DB   | Qdrant                              |
-| AI/LLM      | OpenAI GPT-4o, LangChain, LangGraph|
-| Frontend    | React, Tailwind CSS, Vite           |
-| Deployment  | Docker Compose, Nginx               |
+- **Multi-Agent Analysis**: 7 specialized AI agents orchestrated via LangGraph.
+- **Operational Intelligence**: Automatic extraction of Tasks, Decisions, Risks, and Contradictions.
+- **Semantic Memory**: Long-term organizational memory using Qdrant vector storage.
+- **Multi-Channel**: Seamless integration with Web, Slack, and WhatsApp.
+- **Auto-Transcription**: High-fidelity transcription of meeting audio via OpenAI Whisper.
+- **Premium UI**: Modern glassmorphic dashboard for visualizing intelligence findings.
 
-## Quick Start
+## 🛠️ Architecture
 
-```bash
-# 1. Clone and configure
-cp .env.example .env
-# Edit .env with your credentials
+Polis follows a modular, service-oriented architecture:
+- **Frontend**: React 18, Tailwind CSS, Lucide Icons.
+- **Backend**: FastAPI, LangChain, LangGraph.
+- **Database**: PostgreSQL (Relational) + Qdrant (Vector).
+- **Worker**: Celery + Redis for async processing.
+- **Infrastructure**: Docker Compose + Nginx.
 
-# 2. Start all services
-docker compose up --build
+Check the [Architecture Walkthrough](./walkthrough.md) for more details.
 
-# 3. Access
-# Frontend: http://localhost
-# API Docs: http://localhost/api/docs
+## 🚦 Getting Started
+
+### Prerequisites
+- Docker & Docker Compose
+- OpenAI API Key
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/ATripathi13/polis.git
+   cd polis
+   ```
+
+2. **Configure Environment**
+   Create a `.env` file in the root directory:
+   ```env
+   OPENAI_API_KEY=your_key_here
+   DATABASE_URL=postgresql+asyncpg://polis:polis_secret@postgres/polis
+   REDIS_URL=redis://redis:6379/0
+   QDRANT_HOST=qdrant
+   ```
+
+3. **Launch Services**
+   ```bash
+   docker-compose up --build
+   ```
+
+4. **Access the App**
+   - Dashboard: `http://localhost:3000`
+   - API Docs: `http://localhost:8000/docs`
+
+## 🧩 Project Structure
+
+```text
+polis/
+├── backend/            # FastAPI Application & AI Agents
+│   ├── app/
+│   │   ├── agents/     # LangGraph & Specialized Agents
+│   │   ├── api/        # REST Endpoints
+│   │   ├── models/     # SQLAlchemy Models
+│   │   └── services/   # Business Logic
+├── frontend/           # React Dashboard
+│   ├── src/
+│   │   ├── components/ # Shared UI Components
+│   │   └── pages/      # Application Screens
+├── nginx/              # Reverse Proxy Config
+└── docker-compose.yml  # Orchestration
 ```
 
-## Project Structure
-
-```
-Polis/
-├── backend/          # FastAPI + Agents + Services
-├── frontend/         # React + Tailwind
-├── nginx/            # Reverse proxy
-├── docker-compose.yml
-└── .env.example
-```
-
-## API Endpoints
-
-| Method | Endpoint            | Description              |
-|--------|---------------------|--------------------------|
-| POST   | /api/upload         | Upload documents         |
-| POST   | /api/analyze        | Trigger analysis         |
-| POST   | /api/chat           | Chat with Polis          |
-| GET    | /api/memory/search  | Search organizational memory |
-| POST   | /api/slack/webhook  | Slack events             |
-| POST   | /api/whatsapp/webhook | WhatsApp messages      |
-
-## License
-
-Proprietary — All rights reserved.
+## 📜 License
+MIT License - see [LICENSE](LICENSE) for details.
