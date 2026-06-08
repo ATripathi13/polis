@@ -47,7 +47,7 @@ app.add_middleware(
 
 
 # ---- Route Includes ----
-from app.api.routes import upload, analyze, chat, memory, slack, whatsapp  # noqa: E402
+from app.api.routes import upload, analyze, chat, memory, slack, whatsapp, meetings  # noqa: E402
 
 app.include_router(upload.router, prefix="/api", tags=["Upload"])
 app.include_router(analyze.router, prefix="/api", tags=["Analysis"])
@@ -55,6 +55,7 @@ app.include_router(chat.router, prefix="/api", tags=["Chat"])
 app.include_router(memory.router, prefix="/api", tags=["Memory"])
 app.include_router(slack.router, prefix="/api", tags=["Slack"])
 app.include_router(whatsapp.router, prefix="/api", tags=["WhatsApp"])
+app.include_router(meetings.router, prefix="/api", tags=["Meetings"])
 
 
 @app.get("/api/health", tags=["Health"])
