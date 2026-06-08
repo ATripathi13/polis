@@ -1,73 +1,85 @@
 """
-Polis Memory — Qdrant Vector Store Service
+Polis Memory System — Semantic Retrieval and Historical Reasoning
 """
 
-from qdrant_client import QdrantClient
-from qdrant_client.http import models
-from qdrant_client.http.exceptions import UnexpectedResponse
+import uuid
+from typing import List, Dict, Any
+from langchain_openai import OpenAIEmbeddings
 
 from app.config import settings
+from app.services.memory import memory_service
 
 
-class MemoryService:
+class MemoryManager:
     """
-    Service for semantic memory storage and retrieval using Qdrant.
+    High-level manager for the organizational memory system.
+    Orchestrates embedding generation and Qdrant interactions.
     """
 
     def __init__(self):
-        self.client = QdrantClient(
-            host=settings.qdrant_host,
-            port=settings.qdrant_port,
+        self.embeddings = OpenAIEmbeddings(
+            model=settings.openai_embedding_model,
+            api_key=settings.openai_api_key,
         )
-        self.collection_name = settings.qdrant_collection
-        self.vector_size = 1536  # Default for OpenAI text-embedding-3-small
 
-    async def ensure_collection(self):
-        """Ensure the collection exists in Qdrant."""
-        try:
-            self.client.get_collection(self.collection_name)
-        except (UnexpectedResponse, Exception):
-            self.client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config=models.VectorParams(
-                    size=self.vector_size,
-                    distance=models.Distance.COSINE,
-                ),
+    async def store_document(self, doc_id: str, text: str, metadata: Dict[str, Any]):
+        """
+        Chunk a document, embed chunks, and store in vector database.
+        """
+        # Ensure collection exists
+        await memory_service.ensure_collection()
+        
+        # Split text into chunks (simple overlap strategy for now)
+        chunks = self._chunk_text(text)
+        
+        for i, chunk in enumerate(chunks):
+            vector = await self.embeddings.aembed_query(chunk)
+            chunk_metadata = metadata.copy()
+            chunk_metadata["content"] = chunk
+            chunk_metadata["chunk_index"] = i
+            
+            # Create a unique ID for the chunk
+            chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{doc_id}_{i}"))
+            
+            await memory_service.upsert_memory(
+                id=chunk_id,
+                vector=vector,
+                payload=chunk_metadata
             )
 
-    async def upsert_memory(self, id: str, vector: list[float], payload: dict):
-        """Insert or update a memory point."""
-        self.client.upsert(
-            collection_name=self.collection_name,
-            points=[
-                models.PointStruct(
-                    id=id,
-                    vector=vector,
-                    payload=payload,
-                )
-            ],
-        )
-
-    async def search_memory(self, vector: list[float], limit: int = 10, filters: dict = None):
-        """Search for similar memories."""
-        query_filter = None
-        if filters:
-            must_filters = []
-            for key, value in filters.items():
-                must_filters.append(
-                    models.FieldCondition(
-                        key=key,
-                        match=models.MatchValue(value=value),
-                    )
-                )
-            query_filter = models.Filter(must=must_filters)
-
-        return self.client.search(
-            collection_name=self.collection_name,
-            query_vector=vector,
+    async def retrieve_context(self, query: str, filters: Dict[str, Any] = None, limit: int = 5) -> str:
+        """
+        Search for relevant memory chunks and format as context string.
+        """
+        query_vector = await self.embeddings.aembed_query(query)
+        results = await memory_service.search_memory(
+            vector=query_vector,
             limit=limit,
-            query_filter=query_filter,
+            filters=filters
         )
+        
+        context_parts = []
+        for res in results:
+            content = res.payload.get("content", "")
+            source = res.payload.get("filename", "unknown source")
+            context_parts.append(f"Source [{source}]:\n{content}")
+            
+        return "\n\n---\n\n".join(context_parts)
+
+    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
+        """Split text into overlapping chunks."""
+        chunks = []
+        if not text:
+            return chunks
+            
+        start = 0
+        while start < len(text):
+            end = start + chunk_size
+            chunks.append(text[start:end])
+            start = end - overlap
+            if start >= len(text) - overlap:
+                break
+        return chunks
 
 
-memory_service = MemoryService()
+memory_manager = MemoryManager()
