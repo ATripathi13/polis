@@ -3,6 +3,7 @@ Polis Analysis Service — Orchestration of the analysis pipeline
 """
 
 import uuid
+from typing import Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -10,6 +11,7 @@ from app.models.document import Document
 from app.models.meeting import Meeting
 from app.services.file_processor import file_processor
 from app.services.memory import memory_manager
+from app.agents.orchestrator import orchestrator
 
 
 class AnalysisService:
@@ -70,8 +72,86 @@ class AnalysisService:
             }
         )
         
+    async def run_analysis_pipeline(
+        self,
+        db: AsyncSession,
+        meeting_id: uuid.UUID
+    ) -> Dict[str, Any]:
+        """
+        Run the full AI orchestration pipeline on a meeting's transcript
+        and persist results to the database.
+        """
+        # 1. Fetch the meeting
+        stmt = select(Meeting).where(Meeting.id == meeting_id)
+        result = await db.execute(stmt)
+        meeting = result.scalar_one_or_none()
+        
+        if not meeting or not meeting.raw_transcript:
+            return {"error": "Meeting not found or has no transcript"}
+
+        # 2. Run Orchestrator
+        state = await orchestrator.run(meeting.raw_transcript)
+        
+        # 3. Update Meeting with cleaned transcript and mapping
+        if state["transcript"]:
+            meeting.processed_transcript = state["transcript"].cleaned_transcript
+            meeting.speaker_mapping = {s.speaker_id: s.full_name for s in state["transcript"].speakers}
+        
+        # 4. Persist Tasks
+        if state["tasks"]:
+            from app.models.task import Task
+            for t in state["tasks"].tasks:
+                db_task = Task(
+                    description=t.description,
+                    owner=t.owner,
+                    deadline=t.deadline,
+                    priority=t.priority,
+                    confidence_score=t.confidence,
+                    meeting_id=meeting.id
+                )
+                db.add(db_task)
+
+        # 5. Persist Contradictions
+        if state["contradictions"]:
+            from app.models.contradiction import Contradiction
+            for c in state["contradictions"].contradictions:
+                db_c = Contradiction(
+                    category=c.category,
+                    explanation=c.explanation,
+                    severity=c.severity,
+                    confidence_score=c.confidence,
+                    meeting_id=meeting.id
+                )
+                db.add(db_c)
+
+        # 6. Persist Risks
+        if state["risks"]:
+            from app.models.risk import Risk
+            for r in state["risks"].risks:
+                db_r = Risk(
+                    category=r.category,
+                    description=r.description,
+                    severity=r.severity,
+                    likelihood=r.likelihood,
+                    impact=r.impact,
+                    confidence_score=r.confidence,
+                    meeting_id=meeting.id
+                )
+                db.add(db_r)
+
+        # 7. Persist Final Summary
+        if state["final_summary"]:
+            from app.models.summary import Summary
+            db_s = Summary(
+                content=state["final_summary"].executive_summary,
+                type="EXECUTIVE",
+                confidence_score=1.0, # Validator score could go here
+                meeting_id=meeting.id
+            )
+            db.add(db_s)
+
         await db.commit()
-        return doc
+        return {"status": "completed", "meeting_id": str(meeting_id)}
 
 
 analysis_service = AnalysisService()

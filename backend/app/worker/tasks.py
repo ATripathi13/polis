@@ -9,14 +9,27 @@ from app.worker.celery_app import celery_app
 def analyze_document(self, document_id: str, organization_id: str):
     """
     Run the full analysis pipeline on a document.
-    This task is dispatched asynchronously from the /analyze endpoint.
-    Will be fully implemented in Phase 5 (Orchestration).
     """
-    self.update_state(state="PROCESSING", meta={"document_id": document_id})
+    import asyncio
+    import uuid
+    from app.database import async_session_factory
+    from app.services.analysis import analysis_service
+    from app.models.document import Document
+    from sqlalchemy import select
 
-    # Placeholder — orchestrator integration in Phase 5
-    return {
-        "status": "completed",
-        "document_id": document_id,
-        "message": "Analysis pipeline will be connected in Phase 5",
-    }
+    async def run_async():
+        async with async_session_factory() as db:
+            # 1. Get the document to find linked meeting
+            stmt = select(Document).where(Document.id == uuid.UUID(document_id))
+            res = await db.execute(stmt)
+            doc = res.scalar_one_or_none()
+            
+            if not doc or not doc.meeting_id:
+                return {"error": "Document or linked meeting not found"}
+                
+            # 2. Run the orchestration pipeline
+            return await analysis_service.run_analysis_pipeline(db, doc.meeting_id)
+
+    # Celery tasks are synchronous wrappers for our async logic
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(run_async())
